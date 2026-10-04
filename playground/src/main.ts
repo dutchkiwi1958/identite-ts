@@ -1,11 +1,14 @@
 import type { ExtractionResult } from 'identite-ts';
-import { creerDatamatrixEngine, creerOcrEngine, decrireCodeBarre, extractDocument } from 'identite-ts';
-import { type Passe, observer } from './passes';
-import { pretraitements } from './pretraitement';
-import { construireRapport, lireDimensions, lireOrientationExif } from './rapport';
+import {
+  creerDatamatrixEngine,
+  creerOcrEngine,
+  extractDocument
+} from 'identite-ts';
 
-// Le moteur OCR porte un worker : on le crée une fois et on le réutilise d'une analyse
-// à l'autre, sinon chaque dépôt repaie le chargement du WASM.
+import { type Passe, observer } from './passes';
+
+// Keep one OCR worker alive and reuse it.
+// This makes later scans considerably faster.
 let ocrReel: ReturnType<typeof creerOcrEngine> | undefined;
 
 const zone = document.querySelector('#zone') as HTMLDivElement;
@@ -13,117 +16,214 @@ const fichier = document.querySelector('#fichier') as HTMLInputElement;
 const statut = document.querySelector('#statut') as HTMLParagraphElement;
 const resultat = document.querySelector('#resultat') as HTMLPreElement;
 const apercu = document.querySelector('#apercu') as HTMLImageElement;
-const diagnostic = document.querySelector('#diagnostic') as HTMLElement;
-const diagnosticContenu = document.querySelector('#diagnostic-contenu') as HTMLPreElement;
-const rapport = document.querySelector('#rapport') as HTMLElement;
-const rapportContenu = document.querySelector('#rapport-contenu') as HTMLPreElement;
-const rapportCopier = document.querySelector('#rapport-copier') as HTMLButtonElement;
-const vignettes = document.querySelector('#vignettes') as HTMLElement;
-const vignettesContenu = document.querySelector('#vignettes-contenu') as HTMLDivElement;
 
-/** Montre ce que l'OCR reçoit réellement. Contient le document : jamais partagé. */
-async function afficherPretraitements(f: File): Promise<void> {
-  vignettesContenu.replaceChildren();
-  for (const { legende, canvas } of await pretraitements(f)) {
-    const figure = document.createElement('figure');
-    const titre = document.createElement('figcaption');
-    titre.textContent = legende;
-    figure.append(canvas, titre);
-    vignettesContenu.append(figure);
+
+/**
+ * Convert YYYY-MM-DD to DD-MM-YYYY.
+ */
+function formatDate(value?: string): string {
+  if (!value) return '';
+
+  const parts = value.split('-');
+
+  if (parts.length !== 3) {
+    return value;
   }
-  vignettes.style.display = 'block';
+
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
 
-rapportCopier.addEventListener('click', () => {
-  void navigator.clipboard.writeText(rapportContenu.textContent ?? '').then(() => {
-    rapportCopier.textContent = 'Copié ✓';
-    setTimeout(() => {
-      rapportCopier.textContent = 'Copier le rapport';
-    }, 2000);
-  });
-});
-
-zone.addEventListener('click', () => fichier.click());
-fichier.addEventListener('change', () => {
-  const f = fichier.files?.[0];
-  if (f) void analyser(f);
-});
-
-zone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  zone.classList.add('actif');
-});
-zone.addEventListener('dragleave', () => zone.classList.remove('actif'));
-zone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  zone.classList.remove('actif');
-  const f = e.dataTransfer?.files[0];
-  if (f) void analyser(f);
-});
-
-const LIBELLES: Record<ExtractionResult['document'], string> = {
-  'carte-identite': "Carte d'identité",
-  passeport: 'Passeport',
-  'carte-vitale': 'Carte Vitale',
-  inconnu: 'Document non reconnu',
-};
 
 /**
- * Libellé lisible du document. Le pays émetteur est affiché tel quel : le code
- * ICAO à trois lettres n'est pas toujours un code ISO (`D` pour l'Allemagne),
- * le traduire demanderait une table que le playground n'a pas à embarquer.
+ * Safely read a field returned by identite-ts.
  */
-function libelleDocument(extraction: ExtractionResult): string {
-  const libelle = LIBELLES[extraction.document];
-  return extraction.paysEmetteur ? `${libelle} (${extraction.paysEmetteur})` : libelle;
+function valeur(field: unknown): string {
+  if (!field) return '';
+
+  if (typeof field === 'string') {
+    return field;
+  }
+
+  if (
+    typeof field === 'object' &&
+    field !== null &&
+    'valeur' in field
+  ) {
+    const value = (field as { valeur?: unknown }).valeur;
+
+    if (value === undefined || value === null) {
+      return '';
+    }
+
+    return String(value);
+  }
+
+  return '';
 }
+
 
 /**
- * Décrit les codes 2D que la bibliothèque n'a pas su interpréter. Le résumé
- * est dépourvu de donnée personnelle : il peut être joint à un rapport de bug
- * sur un format inconnu, ce que le contenu brut ne permet pas.
+ * Read first names from the array returned by identite-ts.
  */
-function afficherDiagnostic(extraction: ExtractionResult): void {
-  const inconnus = (extraction.raw.codesBarres ?? []).filter((c) => !c.texte.startsWith('DC'));
-  if (inconnus.length === 0) return;
-  diagnosticContenu.textContent = JSON.stringify(inconnus.map(decrireCodeBarre), null, 2);
-  diagnostic.style.display = 'block';
+function prenoms(field: unknown): string {
+  if (!Array.isArray(field)) {
+    return '';
+  }
+
+  return field
+    .map((item) => valeur(item))
+    .filter((item) => item !== '')
+    .join(' ');
 }
 
+
+/**
+ * Create clean passport output.
+ */
+function afficherResultat(extraction: ExtractionResult): void {
+
+  const data = extraction.data as Record<string, unknown>;
+
+  const nom = valeur(data.nom);
+  const firstname = prenoms(data.prenoms);
+  const sexe = valeur(data.sexe);
+  const naissance = valeur(data.dateNaissance);
+  const nationalite = valeur(data.nationalite);
+  const numero = valeur(data.numeroDocument);
+  const expiration = valeur(data.dateExpiration);
+
+  const confidence = Math.round(extraction.confidence * 100);
+
+  resultat.textContent =
+`PASSPORT SCANNED
+
+Surname:          ${nom}
+Given names:      ${firstname}
+Nationality:      ${nationalite}
+Date of birth:    ${formatDate(naissance)}
+Sex:              ${sexe}
+Passport number:  ${numero}
+Expiry date:      ${formatDate(expiration)}
+
+Issuing country:  ${extraction.paysEmetteur ?? ''}
+Source:           ${extraction.source ?? ''}
+MRZ confidence:   ${confidence} %
+`;
+
+}
+
+
+/**
+ * Analyse uploaded/captured passport.
+ */
 async function analyser(f: File): Promise<void> {
+
   apercu.src = URL.createObjectURL(f);
   apercu.style.display = 'block';
+
   resultat.textContent = '';
-  diagnostic.style.display = 'none';
-  rapport.style.display = 'none';
-  vignettes.style.display = 'none';
-  statut.textContent = 'Analyse en cours… (le premier passage télécharge les moteurs OCR/WASM)';
+
+  statut.textContent =
+    'Scanning passport... Please wait.';
+
   const debut = performance.now();
+
   try {
-    const [dimensions, orientationExif] = await Promise.all([
-      lireDimensions(f),
-      lireOrientationExif(f),
-      afficherPretraitements(f),
-    ]);
+
+    // Create OCR engine once.
     ocrReel ??= creerOcrEngine();
+
     const passes: Passe[] = [];
+
     const extraction = await extractDocument(f, {
-      engines: { ocr: observer(ocrReel, passes), datamatrix: creerDatamatrixEngine() },
+      engines: {
+        ocr: observer(ocrReel, passes),
+        datamatrix: creerDatamatrixEngine()
+      }
     });
+
     const dureeMs = performance.now() - debut;
-    statut.textContent = `${libelleDocument(extraction)} — source : ${extraction.source ?? 'aucune'} — confiance : ${(extraction.confidence * 100).toFixed(0)} % — ${(dureeMs / 1000).toFixed(1)}s`;
-    afficherDiagnostic(extraction);
-    resultat.textContent = JSON.stringify(extraction, null, 2);
-    rapportContenu.textContent = construireRapport({
-      fichier: f,
-      extraction,
-      dureeMs,
-      dimensions,
-      orientationExif,
-      passes,
-    });
-    rapport.style.display = 'block';
-  } catch (erreur) {
-    statut.textContent = `Erreur : ${erreur instanceof Error ? erreur.message : String(erreur)}`;
+
+    if (extraction.document === 'inconnu') {
+
+      statut.textContent =
+        'Document could not be recognized. Please try again.';
+
+      resultat.textContent = '';
+
+      return;
+    }
+
+    afficherResultat(extraction);
+
+    statut.textContent =
+      `Passport recognized — ${Math.round(
+        extraction.confidence * 100
+      )}% confidence — ${(dureeMs / 1000).toFixed(1)} seconds`;
+
+  } catch (error) {
+
+    console.error(error);
+
+    statut.textContent =
+      `Scan error: ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`;
+
   }
 }
+
+
+/*
+ * File selection
+ */
+zone.addEventListener('click', () => {
+  fichier.click();
+});
+
+
+fichier.addEventListener('change', () => {
+
+  const f = fichier.files?.[0];
+
+  if (f) {
+    void analyser(f);
+  }
+
+});
+
+
+/*
+ * Drag & drop
+ */
+zone.addEventListener('dragover', (event) => {
+
+  event.preventDefault();
+
+  zone.classList.add('actif');
+
+});
+
+
+zone.addEventListener('dragleave', () => {
+
+  zone.classList.remove('actif');
+
+});
+
+
+zone.addEventListener('drop', (event) => {
+
+  event.preventDefault();
+
+  zone.classList.remove('actif');
+
+  const f = event.dataTransfer?.files[0];
+
+  if (f) {
+    void analyser(f);
+  }
+
+});
