@@ -1,19 +1,3 @@
-/**
- * ============================================================
- * Winterharbor - MRZ Passport Scanner
- * File: playground/src/main.ts
- * ============================================================
- *
- * Purpose:
- * - Read passport / identity document images with identite-ts
- * - Keep the working identite-ts OCR engine unchanged
- * - Extract useful passport information
- * - Display clean passport information
- * - Store the scanned data for later use in Winterharbor Booking
- *
- * ============================================================
- */
-
 import type { ExtractionResult } from 'identite-ts';
 
 import {
@@ -28,24 +12,45 @@ import {
 } from './passes';
 
 
-/**
- * ------------------------------------------------------------
- * OCR ENGINE
- * ------------------------------------------------------------
+/*
+ * ============================================================
+ * CONFIGURATION
+ * ============================================================
+ */
+
+const bookingReceiver =
+  'https://booking.winterharbor.online/booking/admin/actions/passport_scan_receive.php';
+
+
+/*
+ * Read scan token from:
  *
- * The OCR worker is created only once and reused.
- * This avoids downloading/loading the WASM OCR engine again
- * for every passport scan.
+ * https://dutchkiwi1958.github.io/identite-ts/?token=...
+ */
+
+const urlParams =
+  new URLSearchParams(
+    window.location.search
+  );
+
+const scanToken =
+  urlParams.get('token') ?? '';
+
+
+/*
+ * ============================================================
+ * OCR ENGINE
+ * ============================================================
  */
 
 let ocrReel:
   ReturnType<typeof creerOcrEngine> | undefined;
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * ============================================================
  * PASSPORT DATA
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 type PassportData = {
@@ -75,10 +80,18 @@ let passportData:
   PassportData | null = null;
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * Keep track of the temporary passport preview URL.
+ */
+
+let previewUrl:
+  string | null = null;
+
+
+/*
+ * ============================================================
  * PAGE ELEMENTS
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 const zone =
@@ -116,18 +129,10 @@ const scanAgainButton =
   as HTMLButtonElement;
 
 
-/**
- * ------------------------------------------------------------
- * FORMAT DATE
- * ------------------------------------------------------------
- *
- * Convert:
- *
- * 1958-07-17
- *
- * to:
- *
- * 17-07-1958
+/*
+ * ============================================================
+ * DATE FORMAT
+ * ============================================================
  */
 
 function formatDate(
@@ -141,31 +146,20 @@ function formatDate(
   const parts =
     value.split('-');
 
-
   if (parts.length !== 3) {
     return value;
   }
 
-
   return (
     `${parts[2]}-${parts[1]}-${parts[0]}`
   );
-
 }
 
 
-/**
- * ------------------------------------------------------------
- * READ SIMPLE IDENTITE-TS FIELD
- * ------------------------------------------------------------
- *
- * identite-ts normally returns:
- *
- * {
- *     valeur: "...",
- *     source: "mrz",
- *     checksumValide: true
- * }
+/*
+ * ============================================================
+ * READ IDENTITE-TS VALUE
+ * ============================================================
  */
 
 function valeur(
@@ -216,25 +210,13 @@ function valeur(
 
 
   return '';
-
 }
 
 
-/**
- * ------------------------------------------------------------
- * READ GIVEN NAMES
- * ------------------------------------------------------------
- *
- * identite-ts returns given names similar to:
- *
- * {
- *     valeur: [
- *         "BOB",
- *         "OTTO",
- *         "BERT"
- *     ],
- *     source: "mrz"
- * }
+/*
+ * ============================================================
+ * GIVEN NAMES
+ * ============================================================
  */
 
 function prenoms(
@@ -268,8 +250,7 @@ function prenoms(
       return value
         .map(
           (item) =>
-            String(item)
-              .trim()
+            String(item).trim()
         )
         .filter(
           (item) =>
@@ -292,14 +273,43 @@ function prenoms(
 
 
   return '';
+}
+
+
+/*
+ * ============================================================
+ * REMOVE PASSPORT IMAGE PREVIEW
+ * ============================================================
+ */
+
+function removePreview(): void {
+
+  if (previewUrl) {
+
+    URL.revokeObjectURL(
+      previewUrl
+    );
+
+    previewUrl =
+      null;
+
+  }
+
+
+  apercu.src =
+    '';
+
+
+  apercu.style.display =
+    'none';
 
 }
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * ============================================================
  * DISPLAY RESULT
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 function afficherResultat(
@@ -310,10 +320,6 @@ function afficherResultat(
     extraction.data
     as Record<string, unknown>;
 
-
-  /**
-   * Read the fields returned by identite-ts.
-   */
 
   const nom =
     valeur(
@@ -363,11 +369,8 @@ function afficherResultat(
     );
 
 
-  /**
-   * Save the passport information.
-   *
-   * Later this object can be sent directly to the
-   * Winterharbor Booking guest form.
+  /*
+   * Save extracted information in memory.
    */
 
   passportData = {
@@ -402,8 +405,8 @@ function afficherResultat(
   };
 
 
-  /**
-   * Show clean result on screen.
+  /*
+   * Display information for staff verification.
    */
 
   resultat.textContent =
@@ -423,31 +426,40 @@ MRZ confidence:   ${passportData.confidence} %`;
 }
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * ============================================================
  * ANALYSE PASSPORT
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 async function analyser(
   f: File
 ): Promise<void> {
 
-  /**
-   * Display the selected passport image.
+  /*
+   * Remove previous preview first.
    */
 
-  apercu.src =
+  removePreview();
+
+
+  /*
+   * Create temporary local preview.
+   *
+   * This does NOT upload the photograph.
+   */
+
+  previewUrl =
     URL.createObjectURL(f);
+
+
+  apercu.src =
+    previewUrl;
 
 
   apercu.style.display =
     'block';
 
-
-  /**
-   * Reset previous result.
-   */
 
   passportData =
     null;
@@ -467,29 +479,21 @@ async function analyser(
 
   try {
 
-    /**
-     * Create OCR engine only once.
+    /*
+     * Create/reuse OCR worker.
      */
 
     ocrReel ??=
       creerOcrEngine();
 
 
-    /**
-     * Keep the original working OCR observer.
-     */
-
     const passes:
       Passe[] = [];
 
 
-    /**
-     * IMPORTANT:
-     *
-     * This is the identite-ts extraction method that
-     * already works on the iPhone.
-     *
-     * Do not replace this with generic Tesseract OCR.
+    /*
+     * Keep the identite-ts OCR implementation
+     * that already works on the iPhone.
      */
 
     const extraction =
@@ -519,10 +523,6 @@ async function analyser(
       debut;
 
 
-    /**
-     * Document not recognized.
-     */
-
     if (
       extraction.document ===
       'inconnu'
@@ -541,8 +541,8 @@ async function analyser(
     }
 
 
-    /**
-     * Display passport information.
+    /*
+     * Display extracted information.
      */
 
     afficherResultat(
@@ -591,10 +591,10 @@ async function analyser(
 }
 
 
-/**
- * ------------------------------------------------------------
- * OPEN FILE / CAMERA
- * ------------------------------------------------------------
+/*
+ * ============================================================
+ * OPEN CAMERA / FILE
+ * ============================================================
  */
 
 zone.addEventListener(
@@ -607,10 +607,10 @@ zone.addEventListener(
 );
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * ============================================================
  * FILE SELECTED
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 fichier.addEventListener(
@@ -631,10 +631,10 @@ fichier.addEventListener(
 );
 
 
-/**
- * ------------------------------------------------------------
- * DRAG OVER
- * ------------------------------------------------------------
+/*
+ * ============================================================
+ * DRAG & DROP
+ * ============================================================
  */
 
 zone.addEventListener(
@@ -651,12 +651,6 @@ zone.addEventListener(
 );
 
 
-/**
- * ------------------------------------------------------------
- * DRAG LEAVE
- * ------------------------------------------------------------
- */
-
 zone.addEventListener(
   'dragleave',
   () => {
@@ -668,12 +662,6 @@ zone.addEventListener(
   }
 );
 
-
-/**
- * ------------------------------------------------------------
- * DROP IMAGE
- * ------------------------------------------------------------
- */
 
 zone.addEventListener(
   'drop',
@@ -702,40 +690,25 @@ zone.addEventListener(
 );
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * ============================================================
  * SCAN AGAIN
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 scanAgainButton.addEventListener(
   'click',
   () => {
 
-    /**
-     * Clear stored passport.
-     */
-
     passportData =
       null;
 
-
-    /**
-     * Clear previous file.
-     *
-     * This is important because it allows the same
-     * photograph to be selected again.
-     */
 
     fichier.value =
       '';
 
 
-    /**
-     * Reset screen.
-     */
-
-    resultat.textContent =
+    resultaat.textContent =
       'No passport scanned.';
 
 
@@ -743,17 +716,8 @@ scanAgainButton.addEventListener(
       'Ready to scan';
 
 
-    apercu.src =
-      '';
+    removePreview();
 
-
-    apercu.style.display =
-      'none';
-
-
-    /**
-     * Open camera / file selector again.
-     */
 
     fichier.click();
 
@@ -761,23 +725,21 @@ scanAgainButton.addEventListener(
 );
 
 
-/**
- * ------------------------------------------------------------
+/*
+ * ============================================================
  * USE PASSPORT DATA
- * ------------------------------------------------------------
+ * ============================================================
  */
 
 useDataButton.addEventListener(
   'click',
-  () => {
+  async () => {
 
-    /**
-     * No successful passport scan yet.
+    /*
+     * Passport must first be scanned.
      */
 
-    if (
-      !passportData
-    ) {
+    if (!passportData) {
 
       alert(
         'Please scan a passport first.'
@@ -788,56 +750,277 @@ useDataButton.addEventListener(
     }
 
 
-    /**
-     * Show object in browser console.
-     *
-     * Later this object will be returned to the
-     * Winterharbor Booking guest form.
+    /*
+     * Scanner must have been opened with a valid
+     * scan token from the Booking computer.
      */
 
-    console.log(
-      'PASSPORT DATA:',
-      passportData
-    );
+    if (!scanToken) {
+
+      alert(
+        'No scan token found.\n\n'
+        + 'Please open this scanner using the QR code '
+        + 'from the Booking computer.'
+      );
+
+      return;
+
+    }
 
 
-    /**
-     * Temporary confirmation.
+    /*
+     * Basic client-side token validation.
      *
-     * In the Booking version this alert will be
-     * replaced with automatic form population.
+     * Server performs the real validation again.
      */
 
-    alert(
-`Passport data ready.
+    if (
+      !/^[a-f0-9]{64}$/.test(
+        scanToken
+      )
+    ) {
 
-Surname:
-${passportData.surname}
+      alert(
+        'Invalid scan token.'
+      );
 
-Given names:
-${passportData.given_names}
+      return;
 
-Passport number:
-${passportData.passport_number}
+    }
 
-Nationality:
-${passportData.nationality}
 
-Date of birth:
-${formatDate(passportData.date_of_birth)}
+    /*
+     * Disable button so staff cannot accidentally
+     * submit the same passport twice.
+     */
 
-Sex:
-${passportData.sex}
+    useDataButton.disabled =
+      true;
 
-Expiry date:
-${formatDate(passportData.expiry_date)}
 
-Issuing country:
-${passportData.issuing_country}
+    useDataButton.textContent =
+      'Sending...';
 
-Confidence:
-${passportData.confidence} %`
-    );
+
+    statut.textContent =
+      'Sending passport data to Booking...';
+
+
+    try {
+
+      /*
+       * IMPORTANT:
+       *
+       * Only extracted text fields are sent.
+       *
+       * The passport photograph is NOT included.
+       */
+
+      const response =
+        await fetch(
+          bookingReceiver,
+          {
+
+            method:
+              'POST',
+
+            headers: {
+
+              'Content-Type':
+                'application/json'
+
+            },
+
+            body:
+              JSON.stringify({
+
+                scan_token:
+                  scanToken,
+
+                firstname:
+                  passportData.given_names,
+
+                lastname:
+                  passportData.surname,
+
+                nationality:
+                  passportData.nationality,
+
+                date_of_birth:
+                  passportData.date_of_birth,
+
+                sex:
+                  passportData.sex,
+
+                id_number:
+                  passportData.passport_number,
+
+                validtill:
+                  passportData.expiry_date,
+
+                confidence:
+                  passportData.confidence
+
+              })
+
+          }
+        );
+
+
+      /*
+       * Try to read JSON response.
+       */
+
+      let data:
+        {
+          success?: boolean;
+          message?: string;
+          error?: string;
+        };
+
+
+      try {
+
+        data =
+          await response.json();
+
+      } catch {
+
+        throw new Error(
+          'Invalid response from Booking server.'
+        );
+
+      }
+
+
+      /*
+       * Server reported an error.
+       */
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        alert(
+          data.message ||
+          data.error ||
+          '⚠️ Onbekende fout.'
+        );
+
+
+        useDataButton.disabled =
+          false;
+
+
+        useDataButton.textContent =
+          '✓ Use Passport Data';
+
+
+        statut.textContent =
+          'Passport data was not sent.';
+
+
+        return;
+
+      }
+
+
+      /*
+       * ======================================================
+       * SUCCESS
+       * ======================================================
+       */
+
+
+      /*
+       * Remove passport photograph from the page/browser
+       * preview after successful transmission.
+       */
+
+      removePreview();
+
+
+      /*
+       * Clear file input.
+       */
+
+      fichier.value =
+        '';
+
+
+      /*
+       * Clear sensitive data from our JS variable.
+       */
+
+      passportData =
+        null;
+
+
+      /*
+       * Show confirmation.
+       */
+
+      resultaat.textContent =
+`✓ PASSPORT DATA SENT
+
+The passport information was successfully
+sent to the Booking computer.
+
+You may close this scanner.`;
+
+
+      statut.textContent =
+        'Passport data sent successfully.';
+
+
+      useDataButton.textContent =
+        '✓ Data Sent';
+
+
+      /*
+       * Keep button disabled because this token
+       * is single-use.
+       */
+
+      useDataButton.disabled =
+        true;
+
+
+      /*
+       * Scan Again also should not reuse this token.
+       */
+
+      scanAgainButton.disabled =
+        true;
+
+
+  } catch (error) {
+
+      console.error(
+        error
+      );
+
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Could not send passport data to Booking.'
+      );
+
+
+      useDataButton.disabled =
+        false;
+
+
+      useDataButton.textContent =
+        '✓ Use Passport Data';
+
+
+      statut.textContent =
+        'Could not connect to Booking server.';
+
+    }
 
   }
 );
