@@ -66,16 +66,27 @@ function valeur(field: unknown): string {
  * Read first names from the array returned by identite-ts.
  */
 function prenoms(field: unknown): string {
-  if (!Array.isArray(field)) {
+  if (!field || typeof field !== 'object') {
     return '';
   }
 
-  return field
-    .map((item) => valeur(item))
-    .filter((item) => item !== '')
-    .join(' ');
-}
+  if ('valeur' in field) {
+    const value = (field as { valeur?: unknown }).valeur;
 
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => String(item))
+        .filter((item) => item !== '')
+        .join(' ');
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return '';
+}
 
 /**
  * Create clean passport output.
