@@ -14,35 +14,54 @@ import {
 
 /*
  * ============================================================
- * IDENTITE-TS PASSPORT SCANNER
+ * TEMPORARY VERSION CHECK
  * ============================================================
  *
- * File:
- * playground/src/main.ts
- *
- * Purpose:
- * - Scan passport using identite-ts.
- * - Extract MRZ passport information.
- * - Read the temporary scan token from the URL.
- * - Send extracted passport text data to the server.
- *
- * Important:
- * - The passport photograph is NOT uploaded.
- * - The photograph is only temporarily displayed locally.
- * - Only extracted passport/MRZ text data is transmitted.
- * - The scan token is temporary and single-use.
- *
- * Scanner URL:
- *
- * https://dutchkiwi1958.github.io/identite-ts/?token=...
- *
- * Receiver:
- *
- * https://booking.winterharbor.online/admin/actions/
- * passport_scan_receive.php
- *
+ * This label is intentionally displayed on the page.
+ * If VER 1 is visible on the iPhone, this version of main.ts
+ * has been built and deployed by GitHub Pages.
  * ============================================================
  */
+
+const versionLabel =
+  document.createElement('div');
+
+versionLabel.textContent =
+  'VER 1';
+
+versionLabel.style.position =
+  'fixed';
+
+versionLabel.style.top =
+  '5px';
+
+versionLabel.style.left =
+  '5px';
+
+versionLabel.style.zIndex =
+  '99999';
+
+versionLabel.style.background =
+  'red';
+
+versionLabel.style.color =
+  'white';
+
+versionLabel.style.padding =
+  '6px 10px';
+
+versionLabel.style.fontWeight =
+  'bold';
+
+versionLabel.style.fontSize =
+  '18px';
+
+versionLabel.style.borderRadius =
+  '4px';
+
+document.body.appendChild(
+  versionLabel
+);
 
 
 /*
@@ -56,9 +75,9 @@ const receiverUrl =
 
 
 /*
- * Read scan token from URL:
+ * Read scan token from:
  *
- * ?token=...
+ * https://dutchkiwi1958.github.io/identite-ts/?token=...
  */
 
 const urlParams =
@@ -114,7 +133,7 @@ let passportData:
 
 
 /*
- * Temporary local passport preview.
+ * Keep track of the temporary passport preview URL.
  */
 
 let previewUrl:
@@ -176,15 +195,12 @@ function formatDate(
     return '';
   }
 
-
   const parts =
     value.split('-');
-
 
   if (parts.length !== 3) {
     return value;
   }
-
 
   return (
     `${parts[2]}-${parts[1]}-${parts[0]}`
@@ -326,7 +342,6 @@ function removePreview(): void {
       previewUrl
     );
 
-
     previewUrl =
       null;
 
@@ -349,7 +364,7 @@ function removePreview(): void {
  * ============================================================
  */
 
-function afficherResultat(
+function afficherResultaat(
   extraction: ExtractionResult
 ): void {
 
@@ -407,8 +422,7 @@ function afficherResultat(
 
 
   /*
-   * Keep extracted passport data temporarily
-   * in browser memory.
+   * Save extracted information in memory.
    */
 
   passportData = {
@@ -444,7 +458,7 @@ function afficherResultat(
 
 
   /*
-   * Display passport information for verification.
+   * Display information for staff verification.
    */
 
   resultat.textContent =
@@ -475,16 +489,16 @@ async function analyser(
 ): Promise<void> {
 
   /*
-   * Remove previous preview.
+   * Remove previous preview first.
    */
 
   removePreview();
 
 
   /*
-   * Create a temporary LOCAL preview.
+   * Create temporary local preview.
    *
-   * This does not upload the passport photograph.
+   * This does NOT upload the photograph.
    */
 
   previewUrl =
@@ -530,7 +544,8 @@ async function analyser(
 
 
     /*
-     * Use existing identite-ts OCR implementation.
+     * Keep the identite-ts OCR implementation
+     * that already works on the iPhone.
      */
 
     const extraction =
@@ -560,10 +575,6 @@ async function analyser(
       debut;
 
 
-    /*
-     * Document was not recognized.
-     */
-
     if (
       extraction.document ===
       'inconnu'
@@ -586,7 +597,7 @@ async function analyser(
      * Display extracted information.
      */
 
-    afficherResultat(
+    afficherResultaat(
       extraction
     );
 
@@ -683,7 +694,6 @@ zone.addEventListener(
   (event) => {
 
     event.preventDefault();
-
 
     zone.classList.add(
       'actif'
@@ -793,8 +803,8 @@ useDataButton.addEventListener(
 
 
     /*
-     * The scanner must have been opened using
-     * the QR code containing the scan token.
+     * Scanner must have been opened with a valid
+     * scan token from the computer.
      */
 
     if (!scanToken) {
@@ -802,7 +812,7 @@ useDataButton.addEventListener(
       alert(
         'No scan token found.\n\n'
         + 'Please open this scanner using the QR code '
-        + 'shown on the computer.'
+        + 'from the computer.'
       );
 
       return;
@@ -813,7 +823,7 @@ useDataButton.addEventListener(
     /*
      * Basic client-side token validation.
      *
-     * The server validates the token again.
+     * Server performs the real validation again.
      */
 
     if (
@@ -832,7 +842,8 @@ useDataButton.addEventListener(
 
 
     /*
-     * Prevent double submission.
+     * Disable button so staff cannot accidentally
+     * submit the same passport twice.
      */
 
     useDataButton.disabled =
@@ -850,11 +861,9 @@ useDataButton.addEventListener(
     try {
 
       /*
-       * ======================================================
-       * SEND PASSPORT DATA
-       * ======================================================
+       * IMPORTANT:
        *
-       * Only extracted text data is transmitted.
+       * Only extracted text fields are sent.
        *
        * The passport photograph is NOT included.
        */
@@ -911,7 +920,7 @@ useDataButton.addEventListener(
 
 
       /*
-       * Read server response.
+       * Try to read JSON response.
        */
 
       let data:
@@ -937,7 +946,7 @@ useDataButton.addEventListener(
 
 
       /*
-       * Server rejected the data.
+       * Server reported an error.
        */
 
       if (
@@ -948,7 +957,7 @@ useDataButton.addEventListener(
         alert(
           data.message ||
           data.error ||
-          '⚠️ Unknown error.'
+          '⚠️ Onbekende fout.'
         );
 
 
@@ -975,11 +984,6 @@ useDataButton.addEventListener(
        * ======================================================
        */
 
-
-      /*
-       * Remove local passport photograph preview.
-       */
-
       removePreview();
 
 
@@ -992,7 +996,7 @@ useDataButton.addEventListener(
 
 
       /*
-       * Clear passport information from JS memory.
+       * Clear passport data from JS memory.
        */
 
       passportData =
@@ -1020,7 +1024,8 @@ You may close this scanner.`;
 
 
       /*
-       * Token is single-use.
+       * Keep button disabled because this token
+       * is single-use.
        */
 
       useDataButton.disabled =
@@ -1028,7 +1033,7 @@ You may close this scanner.`;
 
 
       /*
-       * A new scan requires a new QR/token.
+       * Scan Again must not reuse this token.
        */
 
       scanAgainButton.disabled =
