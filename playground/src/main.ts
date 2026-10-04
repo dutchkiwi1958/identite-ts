@@ -3,65 +3,76 @@ import type { ExtractionResult } from 'identite-ts';
 import {
   creerDatamatrixEngine,
   creerOcrEngine,
-  extractDocument
+  extractDocument,
 } from 'identite-ts';
 
 import {
   type Passe,
-  observer
+  observer,
 } from './passes';
 
 
 /*
  * ============================================================
- * TEMPORARY VERSION CHECK
+ * IDENTITE-TS PASSPORT SCANNER
  * ============================================================
  *
- * This label is intentionally displayed on the page.
- * If VER 1 is visible on the iPhone, this version of main.ts
- * has been built and deployed by GitHub Pages.
+ * File:
+ * playground/src/main.ts
+ *
+ * Version:
+ * VER 1
+ *
+ * Purpose:
+ * - Scan a passport on the phone.
+ * - Extract passport/MRZ information locally.
+ * - Read the temporary scan token from the URL.
+ * - Send extracted passport data to the server.
+ *
+ * Important:
+ * - The passport photograph is NOT sent to the server.
+ * - The photograph is only used locally for scanning.
+ * - Only extracted text data is transmitted.
+ *
+ * Scanner:
+ * https://dutchkiwi1958.github.io/identite-ts/
+ *
+ * Receiver:
+ * https://booking.winterharbor.online/admin/actions/
+ * passport_scan_receive.php
+ *
  * ============================================================
  */
 
-const versionLabel =
-  document.createElement('div');
 
-versionLabel.textContent =
-  'VER 1';
+/*
+ * ============================================================
+ * TEMPORARY VERSION LABEL
+ * ============================================================
+ *
+ * This is temporary.
+ *
+ * If VER 1 appears on the iPhone, we know that GitHub Pages
+ * is running this version of main.ts.
+ * ============================================================
+ */
 
-versionLabel.style.position =
-  'fixed';
+const versionLabel = document.createElement('div');
 
-versionLabel.style.top =
-  '5px';
+versionLabel.textContent = 'VER 1';
 
-versionLabel.style.left =
-  '5px';
+versionLabel.style.position = 'fixed';
+versionLabel.style.top = '5px';
+versionLabel.style.left = '5px';
+versionLabel.style.zIndex = '99999';
+versionLabel.style.background = 'red';
+versionLabel.style.color = 'white';
+versionLabel.style.padding = '6px 10px';
+versionLabel.style.fontWeight = 'bold';
+versionLabel.style.fontSize = '18px';
+versionLabel.style.borderRadius = '4px';
 
-versionLabel.style.zIndex =
-  '99999';
-
-versionLabel.style.background =
-  'red';
-
-versionLabel.style.color =
-  'white';
-
-versionLabel.style.padding =
-  '6px 10px';
-
-versionLabel.style.fontWeight =
-  'bold';
-
-versionLabel.style.fontSize =
-  '18px';
-
-versionLabel.style.borderRadius =
-  '4px';
-
-document.body.appendChild(
-  versionLabel
-);
+document.body.appendChild(versionLabel);
 
 
 /*
@@ -75,28 +86,28 @@ const receiverUrl =
 
 
 /*
- * Read scan token from:
+ * Read temporary scan token from URL:
  *
- * https://dutchkiwi1958.github.io/identite-ts/?token=...
+ * ?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
  */
 
-const urlParams =
-  new URLSearchParams(
-    window.location.search
-  );
+const urlParams = new URLSearchParams(window.location.search);
 
-const scanToken =
-  urlParams.get('token') ?? '';
+const scanToken = urlParams.get('token') ?? '';
 
 
 /*
  * ============================================================
  * OCR ENGINE
  * ============================================================
+ *
+ * The OCR engine contains a worker.
+ *
+ * Create it once and reuse it for subsequent scans.
+ * ============================================================
  */
 
-let ocrReel:
-  ReturnType<typeof creerOcrEngine> | undefined;
+let ocrReel: ReturnType<typeof creerOcrEngine> | undefined;
 
 
 /*
@@ -106,38 +117,29 @@ let ocrReel:
  */
 
 type PassportData = {
-
   surname: string;
-
   given_names: string;
-
   nationality: string;
-
   date_of_birth: string;
-
   sex: string;
-
   passport_number: string;
-
   expiry_date: string;
-
   issuing_country: string;
-
   confidence: number;
-
 };
 
 
-let passportData:
-  PassportData | null = null;
+let passportData: PassportData | null = null;
 
 
 /*
- * Keep track of the temporary passport preview URL.
+ * Temporary local image URL.
+ *
+ * This is only used to display the passport photograph
+ * on the device while scanning.
  */
 
-let previewUrl:
-  string | null = null;
+let previewUrl: string | null = null;
 
 
 /*
@@ -146,65 +148,42 @@ let previewUrl:
  * ============================================================
  */
 
-const zone =
-  document.querySelector('#zone')
-  as HTMLDivElement;
+const zone = document.querySelector('#zone') as HTMLDivElement;
 
+const fichier = document.querySelector('#fichier') as HTMLInputElement;
 
-const fichier =
-  document.querySelector('#fichier')
-  as HTMLInputElement;
+const statut = document.querySelector('#statut') as HTMLParagraphElement;
 
+const resultat = document.querySelector('#resultat') as HTMLPreElement;
 
-const statut =
-  document.querySelector('#statut')
-  as HTMLParagraphElement;
-
-
-const resultat =
-  document.querySelector('#resultat')
-  as HTMLPreElement;
-
-
-const apercu =
-  document.querySelector('#apercu')
-  as HTMLImageElement;
-
+const apercu = document.querySelector('#apercu') as HTMLImageElement;
 
 const useDataButton =
-  document.querySelector('#use-data')
-  as HTMLButtonElement;
-
+  document.querySelector('#use-data') as HTMLButtonElement;
 
 const scanAgainButton =
-  document.querySelector('#scan-again')
-  as HTMLButtonElement;
+  document.querySelector('#scan-again') as HTMLButtonElement;
 
 
 /*
  * ============================================================
- * DATE FORMAT
+ * FORMAT DATE
  * ============================================================
  */
 
-function formatDate(
-  value?: string
-): string {
+function formatDate(value?: string): string {
 
   if (!value) {
     return '';
   }
 
-  const parts =
-    value.split('-');
+  const parts = value.split('-');
 
   if (parts.length !== 3) {
     return value;
   }
 
-  return (
-    `${parts[2]}-${parts[1]}-${parts[0]}`
-  );
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
 
 
@@ -214,21 +193,15 @@ function formatDate(
  * ============================================================
  */
 
-function valeur(
-  field: unknown
-): string {
+function valeur(field: unknown): string {
 
   if (!field) {
     return '';
   }
 
 
-  if (
-    typeof field === 'string'
-  ) {
-
+  if (typeof field === 'string') {
     return field;
-
   }
 
 
@@ -238,26 +211,22 @@ function valeur(
     'valeur' in field
   ) {
 
-    const value =
-      (
-        field as {
-          valeur?: unknown
-        }
-      ).valeur;
+    const value = (
+      field as {
+        valeur?: unknown;
+      }
+    ).valeur;
 
 
     if (
       value === undefined ||
       value === null
     ) {
-
       return '';
-
     }
 
 
     return String(value);
-
   }
 
 
@@ -267,60 +236,49 @@ function valeur(
 
 /*
  * ============================================================
- * GIVEN NAMES
+ * READ GIVEN NAMES
  * ============================================================
  */
 
-function prenoms(
-  field: unknown
-): string {
+function prenoms(field: unknown): string {
 
   if (
     !field ||
     typeof field !== 'object'
   ) {
-
     return '';
-
   }
 
 
   if ('valeur' in field) {
 
-    const value =
-      (
-        field as {
-          valeur?: unknown
-        }
-      ).valeur;
+    const value = (
+      field as {
+        valeur?: unknown;
+      }
+    ).valeur;
 
 
-    if (
-      Array.isArray(value)
-    ) {
+    /*
+     * identite-ts may return given names as an array.
+     */
+
+    if (Array.isArray(value)) {
 
       return value
-        .map(
-          (item) =>
-            String(item).trim()
-        )
-        .filter(
-          (item) =>
-            item !== ''
-        )
+        .map((item) => String(item).trim())
+        .filter((item) => item !== '')
         .join(' ');
-
     }
 
 
-    if (
-      typeof value === 'string'
-    ) {
+    /*
+     * Or as a normal string.
+     */
 
+    if (typeof value === 'string') {
       return value.trim();
-
     }
-
   }
 
 
@@ -330,7 +288,7 @@ function prenoms(
 
 /*
  * ============================================================
- * REMOVE PASSPORT IMAGE PREVIEW
+ * REMOVE LOCAL PASSPORT PREVIEW
  * ============================================================
  */
 
@@ -338,81 +296,65 @@ function removePreview(): void {
 
   if (previewUrl) {
 
-    URL.revokeObjectURL(
-      previewUrl
-    );
+    URL.revokeObjectURL(previewUrl);
 
-    previewUrl =
-      null;
-
+    previewUrl = null;
   }
 
 
-  apercu.src =
-    '';
+  apercu.src = '';
 
-
-  apercu.style.display =
-    'none';
-
+  apercu.style.display = 'none';
 }
 
 
 /*
  * ============================================================
- * DISPLAY RESULT
+ * DISPLAY PASSPORT RESULT
  * ============================================================
  */
 
-function afficherResultaat(
+function afficherResultat(
   extraction: ExtractionResult
 ): void {
 
   const data =
-    extraction.data
-    as Record<string, unknown>;
+    extraction.data as Record<string, unknown>;
 
 
-  const nom =
-    valeur(
-      data.nom
-    );
+  const nom = valeur(
+    data.nom
+  );
 
 
-  const firstname =
-    prenoms(
-      data.prenoms
-    );
+  const firstname = prenoms(
+    data.prenoms
+  );
 
 
-  const sexe =
-    valeur(
-      data.sexe
-    );
+  const sexe = valeur(
+    data.sexe
+  );
 
 
-  const naissance =
-    valeur(
-      data.dateNaissance
-    );
+  const naissance = valeur(
+    data.dateNaissance
+  );
 
 
-  const nationalite =
-    valeur(
-      data.nationalite
-    );
+  const nationalite = valeur(
+    data.nationalite
+  );
 
 
-  const numero =
-    valeur(
-      data.numeroDocument
-    );
+  const numero = valeur(
+    data.numeroDocument
+  );
 
 
-  const expiration =
-    valeur(
-      data.dateExpiration
-    );
+  const expiration = valeur(
+    data.dateExpiration
+  );
 
 
   const confidence =
@@ -422,43 +364,24 @@ function afficherResultaat(
 
 
   /*
-   * Save extracted information in memory.
+   * Keep extracted information temporarily in memory.
    */
 
   passportData = {
-
-    surname:
-      nom,
-
-    given_names:
-      firstname,
-
-    nationality:
-      nationalite,
-
-    date_of_birth:
-      naissance,
-
-    sex:
-      sexe,
-
-    passport_number:
-      numero,
-
-    expiry_date:
-      expiration,
-
-    issuing_country:
-      extraction.paysEmetteur ?? '',
-
-    confidence:
-      confidence
-
+    surname: nom,
+    given_names: firstname,
+    nationality: nationalite,
+    date_of_birth: naissance,
+    sex: sexe,
+    passport_number: numero,
+    expiry_date: expiration,
+    issuing_country: extraction.paysEmetteur ?? '',
+    confidence: confidence,
   };
 
 
   /*
-   * Display information for staff verification.
+   * Display information so staff can verify the scan.
    */
 
   resultat.textContent =
@@ -474,7 +397,6 @@ Expiry date:      ${formatDate(passportData.expiry_date)}
 
 Issuing country:  ${passportData.issuing_country}
 MRZ confidence:   ${passportData.confidence} %`;
-
 }
 
 
@@ -489,32 +411,30 @@ async function analyser(
 ): Promise<void> {
 
   /*
-   * Remove previous preview first.
+   * Remove previous passport preview.
    */
 
   removePreview();
 
 
   /*
-   * Create temporary local preview.
+   * Create temporary LOCAL image preview.
    *
-   * This does NOT upload the photograph.
+   * The passport image is NOT uploaded.
    */
 
-  previewUrl =
-    URL.createObjectURL(f);
+  previewUrl = URL.createObjectURL(f);
+
+  apercu.src = previewUrl;
+
+  apercu.style.display = 'block';
 
 
-  apercu.src =
-    previewUrl;
+  /*
+   * Clear previous passport information.
+   */
 
-
-  apercu.style.display =
-    'block';
-
-
-  passportData =
-    null;
+  passportData = null;
 
 
   resultat.textContent =
@@ -525,55 +445,49 @@ async function analyser(
     'Scanning passport... Please wait.';
 
 
-  const debut =
-    performance.now();
+  const debut = performance.now();
 
 
   try {
 
     /*
-     * Create/reuse OCR worker.
+     * Create OCR engine once.
      */
 
-    ocrReel ??=
-      creerOcrEngine();
+    ocrReel ??= creerOcrEngine();
 
 
-    const passes:
-      Passe[] = [];
+    const passes: Passe[] = [];
 
 
     /*
-     * Keep the identite-ts OCR implementation
-     * that already works on the iPhone.
+     * Run identite-ts.
      */
 
     const extraction =
       await extractDocument(
         f,
         {
-
           engines: {
-
-            ocr:
-              observer(
-                ocrReel,
-                passes
-              ),
+            ocr: observer(
+              ocrReel,
+              passes
+            ),
 
             datamatrix:
-              creerDatamatrixEngine()
-
-          }
-
+              creerDatamatrixEngine(),
+          },
         }
       );
 
 
     const dureeMs =
-      performance.now() -
-      debut;
+      performance.now() - debut;
 
+
+    /*
+     * Document was not recognized.
+     */
 
     if (
       extraction.document ===
@@ -589,42 +503,33 @@ async function analyser(
 
 
       return;
-
     }
 
 
     /*
-     * Display extracted information.
+     * Display extracted passport information.
      */
 
-    afficherResultaat(
-      extraction
-    );
+    afficherResultat(extraction);
 
 
     statut.textContent =
       `Passport recognized — ${
         Math.round(
-          extraction.confidence *
-          100
+          extraction.confidence * 100
         )
       }% confidence — ${
         (
-          dureeMs /
-          1000
+          dureeMs / 1000
         ).toFixed(1)
       } seconds`;
 
-
   } catch (error) {
 
-    console.error(
-      error
-    );
+    console.error(error);
 
 
-    passportData =
-      null;
+    passportData = null;
 
 
     statut.textContent =
@@ -637,9 +542,7 @@ async function analyser(
 
     resultat.textContent =
       'Passport could not be scanned.';
-
   }
-
 }
 
 
@@ -669,14 +572,11 @@ fichier.addEventListener(
   'change',
   () => {
 
-    const f =
-      fichier.files?.[0];
+    const f = fichier.files?.[0];
 
 
     if (f) {
-
       void analyser(f);
-
     }
 
   }
@@ -685,7 +585,7 @@ fichier.addEventListener(
 
 /*
  * ============================================================
- * DRAG & DROP
+ * DRAG OVER
  * ============================================================
  */
 
@@ -695,25 +595,33 @@ zone.addEventListener(
 
     event.preventDefault();
 
-    zone.classList.add(
-      'actif'
-    );
+    zone.classList.add('actif');
 
   }
 );
 
+
+/*
+ * ============================================================
+ * DRAG LEAVE
+ * ============================================================
+ */
 
 zone.addEventListener(
   'dragleave',
   () => {
 
-    zone.classList.remove(
-      'actif'
-    );
+    zone.classList.remove('actif');
 
   }
 );
 
+
+/*
+ * ============================================================
+ * DROP FILE
+ * ============================================================
+ */
 
 zone.addEventListener(
   'drop',
@@ -721,21 +629,15 @@ zone.addEventListener(
 
     event.preventDefault();
 
-
-    zone.classList.remove(
-      'actif'
-    );
+    zone.classList.remove('actif');
 
 
     const f =
-      event.dataTransfer
-        ?.files[0];
+      event.dataTransfer?.files[0];
 
 
     if (f) {
-
       void analyser(f);
-
     }
 
   }
@@ -752,13 +654,23 @@ scanAgainButton.addEventListener(
   'click',
   () => {
 
-    passportData =
-      null;
+    /*
+     * Clear previous extracted information.
+     */
+
+    passportData = null;
 
 
-    fichier.value =
-      '';
+    /*
+     * Clear selected file.
+     */
 
+    fichier.value = '';
+
+
+    /*
+     * Reset display.
+     */
 
     resultat.textContent =
       'No passport scanned.';
@@ -768,8 +680,16 @@ scanAgainButton.addEventListener(
       'Ready to scan';
 
 
+    /*
+     * Remove previous image.
+     */
+
     removePreview();
 
+
+    /*
+     * Open camera/file selector.
+     */
 
     fichier.click();
 
@@ -798,13 +718,12 @@ useDataButton.addEventListener(
       );
 
       return;
-
     }
 
 
     /*
-     * Scanner must have been opened with a valid
-     * scan token from the computer.
+     * Scanner must have been opened using a QR code
+     * containing the temporary scan token.
      */
 
     if (!scanToken) {
@@ -812,18 +731,17 @@ useDataButton.addEventListener(
       alert(
         'No scan token found.\n\n'
         + 'Please open this scanner using the QR code '
-        + 'from the computer.'
+        + 'shown on the computer.'
       );
 
       return;
-
     }
 
 
     /*
-     * Basic client-side token validation.
+     * Basic browser-side token validation.
      *
-     * Server performs the real validation again.
+     * The PHP receiver performs the real validation again.
      */
 
     if (
@@ -837,18 +755,14 @@ useDataButton.addEventListener(
       );
 
       return;
-
     }
 
 
     /*
-     * Disable button so staff cannot accidentally
-     * submit the same passport twice.
+     * Prevent accidental double submission.
      */
 
-    useDataButton.disabled =
-      true;
-
+    useDataButton.disabled = true;
 
     useDataButton.textContent =
       'Sending...';
@@ -861,74 +775,68 @@ useDataButton.addEventListener(
     try {
 
       /*
-       * IMPORTANT:
+       * ======================================================
+       * SEND PASSPORT DATA
+       * ======================================================
        *
-       * Only extracted text fields are sent.
+       * ONLY extracted text data is transmitted.
        *
-       * The passport photograph is NOT included.
+       * The passport photograph is NOT transmitted.
+       * ======================================================
        */
 
       const response =
         await fetch(
           receiverUrl,
           {
-
-            method:
-              'POST',
+            method: 'POST',
 
             headers: {
-
               'Content-Type':
-                'application/json'
-
+                'application/json',
             },
 
-            body:
-              JSON.stringify({
+            body: JSON.stringify({
+              scan_token:
+                scanToken,
 
-                scan_token:
-                  scanToken,
+              firstname:
+                passportData.given_names,
 
-                firstname:
-                  passportData.given_names,
+              lastname:
+                passportData.surname,
 
-                lastname:
-                  passportData.surname,
+              nationality:
+                passportData.nationality,
 
-                nationality:
-                  passportData.nationality,
+              date_of_birth:
+                passportData.date_of_birth,
 
-                date_of_birth:
-                  passportData.date_of_birth,
+              sex:
+                passportData.sex,
 
-                sex:
-                  passportData.sex,
+              id_number:
+                passportData.passport_number,
 
-                id_number:
-                  passportData.passport_number,
+              validtill:
+                passportData.expiry_date,
 
-                validtill:
-                  passportData.expiry_date,
-
-                confidence:
-                  passportData.confidence
-
-              })
-
+              confidence:
+                passportData.confidence,
+            }),
           }
         );
 
 
       /*
-       * Try to read JSON response.
+       * Read JSON response from PHP.
        */
 
-      let data:
-        {
-          success?: boolean;
-          message?: string;
-          error?: string;
-        };
+      let data: {
+        success?: boolean;
+        message?: string;
+        error?: string;
+      };
 
 
       try {
@@ -941,12 +849,11 @@ useDataButton.addEventListener(
         throw new Error(
           'Invalid response from server.'
         );
-
       }
 
 
       /*
-       * Server reported an error.
+       * PHP receiver reported an error.
        */
 
       if (
@@ -974,7 +881,6 @@ useDataButton.addEventListener(
 
 
         return;
-
       }
 
 
@@ -984,6 +890,11 @@ useDataButton.addEventListener(
        * ======================================================
        */
 
+
+      /*
+       * Remove local passport photograph.
+       */
+
       removePreview();
 
 
@@ -991,20 +902,18 @@ useDataButton.addEventListener(
        * Clear file input.
        */
 
-      fichier.value =
-        '';
+      fichier.value = '';
 
 
       /*
-       * Clear passport data from JS memory.
+       * Clear passport information from JS memory.
        */
 
-      passportData =
-        null;
+      passportData = null;
 
 
       /*
-       * Show confirmation.
+       * Display confirmation.
        */
 
       resultat.textContent =
@@ -1024,27 +933,23 @@ You may close this scanner.`;
 
 
       /*
-       * Keep button disabled because this token
-       * is single-use.
+       * Token is single-use.
+       *
+       * Do not allow another submission.
        */
 
-      useDataButton.disabled =
-        true;
+      useDataButton.disabled = true;
 
 
       /*
-       * Scan Again must not reuse this token.
+       * A new passport scan requires a new QR/token.
        */
 
-      scanAgainButton.disabled =
-        true;
+      scanAgainButton.disabled = true;
 
+  } catch (error) {
 
-    } catch (error) {
-
-      console.error(
-        error
-      );
+      console.error(error);
 
 
       alert(
@@ -1064,7 +969,6 @@ You may close this scanner.`;
 
       statut.textContent =
         'Could not connect to server.';
-
     }
 
   }
