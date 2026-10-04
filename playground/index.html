@@ -1,289 +1,793 @@
 <!doctype html>
+
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
+    <!--
+    ============================================================
+    Winterharbor - MRZ Passport Scanner
+    File: playground/index.html
+    ============================================================
 
-  <title>MRZ Passport Scanner</title>
+    Purpose:
+    - Mobile friendly passport scanning interface
+    - Works with identite-ts
+    - Take passport photo or select existing image
+    - Display extracted passport information
+    - Allow scanned information to be used by Winterharbor Booking
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+    ============================================================
+    -->
 
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: Arial, Helvetica, sans-serif;
-      background: #f4f6f8;
-      color: #222;
-    }
+    <meta charset="UTF-8">
 
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-    }
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    >
 
-    h1 {
-      text-align: center;
-      font-size: 26px;
-      margin: 10px 0 8px;
-    }
+    <meta
+        name="theme-color"
+        content="#0d6efd"
+    >
 
-    .subtitle {
-      text-align: center;
-      color: #666;
-      margin-bottom: 25px;
-    }
+    <title>Winterharbor Passport Scanner</title>
 
-    #zone {
-      background: white;
-      border: 2px dashed #999;
-      border-radius: 12px;
-      padding: 30px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: 0.2s;
-    }
 
-    #zone.actif {
-      border-color: #0d6efd;
-      background: #eef5ff;
-    }
+    <style>
 
-    .camera-icon {
-      font-size: 42px;
-      margin-bottom: 10px;
-    }
+        /* =====================================================
+           GENERAL
+           ===================================================== */
 
-    .scan-title {
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
+        * {
+            box-sizing: border-box;
+        }
 
-    .scan-help {
-      color: #666;
-      font-size: 14px;
-      line-height: 1.5;
-    }
 
-    #fichier {
-      display: none;
-    }
+        html {
+            font-size: 18px;
+        }
 
-    #statut {
-      margin-top: 20px;
-      padding: 12px;
-      background: white;
-      border-radius: 8px;
-      text-align: center;
-      font-weight: bold;
-    }
 
-    #apercu {
-      display: none;
-      width: 100%;
-      margin-top: 20px;
-      border-radius: 10px;
-      background: white;
-    }
+        body {
+            margin: 0;
+            padding: 0;
 
-    .result-card {
-      margin-top: 20px;
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
 
-    .result-card h2 {
-      margin-top: 0;
-      text-align: center;
-      color: #198754;
-    }
+            background:
+                #f2f4f7;
 
-    #resultat {
-      margin: 0;
-      white-space: pre-wrap;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 16px;
-      line-height: 1.7;
-    }
+            color:
+                #212529;
+        }
 
-    .buttons {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
 
-    button {
-      flex: 1;
-      border: 0;
-      border-radius: 8px;
-      padding: 14px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+        .container {
+            width: 100%;
+            max-width: 700px;
 
-    #scan-again {
-      background: #6c757d;
-      color: white;
-    }
+            margin: 0 auto;
 
-    #use-data {
-      background: #198754;
-      color: white;
-    }
+            padding:
+                18px;
+        }
 
-    @media (max-width: 500px) {
-      body {
-        padding: 12px;
-      }
 
-      h1 {
-        font-size: 23px;
-      }
+        /* =====================================================
+           HEADER
+           ===================================================== */
 
-      .buttons {
-        flex-direction: column;
-      }
-    }
-  </style>
+        .header {
+            background:
+                #0d6efd;
+
+            color:
+                #ffffff;
+
+            text-align:
+                center;
+
+            padding:
+                22px 15px;
+
+            margin:
+                -18px
+                -18px
+                20px
+                -18px;
+        }
+
+
+        .header h1 {
+            margin:
+                0;
+
+            font-size:
+                1.65rem;
+
+            font-weight:
+                700;
+        }
+
+
+        .header p {
+            margin:
+                8px 0 0 0;
+
+            font-size:
+                1rem;
+
+            opacity:
+                0.95;
+        }
+
+
+        /* =====================================================
+           SCAN AREA
+           ===================================================== */
+
+        #zone {
+            background:
+                #ffffff;
+
+            border:
+                3px dashed
+                #0d6efd;
+
+            border-radius:
+                14px;
+
+            padding:
+                32px 20px;
+
+            text-align:
+                center;
+
+            cursor:
+                pointer;
+
+            user-select:
+                none;
+
+            transition:
+                0.2s;
+        }
+
+
+        #zone:active {
+            transform:
+                scale(0.99);
+
+            background:
+                #eef5ff;
+        }
+
+
+        #zone.actif {
+            background:
+                #e8f2ff;
+
+            border-color:
+                #084298;
+        }
+
+
+        .camera-icon {
+            font-size:
+                3.5rem;
+
+            line-height:
+                1;
+
+            margin-bottom:
+                15px;
+        }
+
+
+        .scan-title {
+            font-size:
+                1.45rem;
+
+            font-weight:
+                bold;
+
+            color:
+                #0d6efd;
+
+            margin-bottom:
+                10px;
+        }
+
+
+        .scan-help {
+            font-size:
+                1rem;
+
+            line-height:
+                1.5;
+
+            color:
+                #495057;
+        }
+
+
+        #fichier {
+            display:
+                none;
+        }
+
+
+        /* =====================================================
+           STATUS
+           ===================================================== */
+
+        #statut {
+            margin:
+                18px 0 0 0;
+
+            padding:
+                15px;
+
+            background:
+                #ffffff;
+
+            border-radius:
+                10px;
+
+            border:
+                1px solid
+                #dee2e6;
+
+            text-align:
+                center;
+
+            font-size:
+                1.05rem;
+
+            font-weight:
+                600;
+
+            line-height:
+                1.4;
+        }
+
+
+        /* =====================================================
+           IMAGE PREVIEW
+           ===================================================== */
+
+        #apercu {
+            display:
+                none;
+
+            width:
+                100%;
+
+            height:
+                auto;
+
+            margin-top:
+                18px;
+
+            border-radius:
+                12px;
+
+            border:
+                1px solid
+                #ced4da;
+
+            background:
+                #ffffff;
+        }
+
+
+        /* =====================================================
+           RESULT CARD
+           ===================================================== */
+
+        .result-card {
+            margin-top:
+                20px;
+
+            padding:
+                20px;
+
+            background:
+                #ffffff;
+
+            border-radius:
+                14px;
+
+            border:
+                1px solid
+                #dee2e6;
+
+            box-shadow:
+                0 3px 10px
+                rgba(
+                    0,
+                    0,
+                    0,
+                    0.08
+                );
+        }
+
+
+        .result-title {
+            margin:
+                0 0 18px 0;
+
+            text-align:
+                center;
+
+            font-size:
+                1.35rem;
+
+            color:
+                #198754;
+        }
+
+
+        #resultat {
+            margin:
+                0;
+
+            padding:
+                15px;
+
+            background:
+                #f8f9fa;
+
+            border-radius:
+                10px;
+
+            white-space:
+                pre-wrap;
+
+            overflow-wrap:
+                anywhere;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            font-size:
+                1.05rem;
+
+            line-height:
+                1.7;
+
+            color:
+                #212529;
+        }
+
+
+        /* =====================================================
+           BUTTONS
+           ===================================================== */
+
+        .buttons {
+            display:
+                flex;
+
+            gap:
+                12px;
+
+            margin-top:
+                20px;
+        }
+
+
+        .button {
+            flex:
+                1;
+
+            min-height:
+                58px;
+
+            padding:
+                14px 16px;
+
+            border:
+                0;
+
+            border-radius:
+                10px;
+
+            font-size:
+                1.05rem;
+
+            font-weight:
+                700;
+
+            cursor:
+                pointer;
+        }
+
+
+        .button:active {
+            transform:
+                scale(0.98);
+        }
+
+
+        #scan-again {
+            background:
+                #6c757d;
+
+            color:
+                #ffffff;
+        }
+
+
+        #use-data {
+            background:
+                #198754;
+
+            color:
+                #ffffff;
+        }
+
+
+        /* =====================================================
+           PRIVACY MESSAGE
+           ===================================================== */
+
+        .privacy {
+            margin-top:
+                20px;
+
+            padding:
+                14px;
+
+            background:
+                #e7f3ff;
+
+            border-left:
+                5px solid
+                #0d6efd;
+
+            border-radius:
+                8px;
+
+            font-size:
+                0.9rem;
+
+            line-height:
+                1.5;
+        }
+
+
+        /* =====================================================
+           HIDDEN ORIGINAL PLAYGROUND ELEMENTS
+           ===================================================== */
+
+        #diagnostic,
+        #rapport,
+        #vignettes {
+            display:
+                none !important;
+        }
+
+
+        /* =====================================================
+           PHONE
+           ===================================================== */
+
+        @media (
+            max-width: 600px
+        ) {
+
+            html {
+                font-size:
+                    19px;
+            }
+
+
+            .container {
+                padding:
+                    12px;
+            }
+
+
+            .header {
+                margin:
+                    -12px
+                    -12px
+                    15px
+                    -12px;
+
+                padding:
+                    20px 12px;
+            }
+
+
+            .header h1 {
+                font-size:
+                    1.45rem;
+            }
+
+
+            #zone {
+                padding:
+                    28px 15px;
+            }
+
+
+            .camera-icon {
+                font-size:
+                    3.2rem;
+            }
+
+
+            .scan-title {
+                font-size:
+                    1.35rem;
+            }
+
+
+            #resultat {
+                font-size:
+                    1rem;
+
+                line-height:
+                    1.65;
+            }
+
+
+            .buttons {
+                flex-direction:
+                    column;
+            }
+
+
+            .button {
+                width:
+                    100%;
+
+                min-height:
+                    62px;
+
+                font-size:
+                    1.1rem;
+            }
+
+        }
+
+    </style>
+
 </head>
+
 
 <body>
 
+
 <div class="container">
 
-  <h1>MRZ Passport Scanner</h1>
 
-  <div class="subtitle">
-    Scan or photograph the passport information page
-  </div>
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
 
-  <div id="zone">
+    <header class="header">
 
-    <div class="camera-icon">📷</div>
+        <h1>
+            Passport Scanner
+        </h1>
 
-    <div class="scan-title">
-      Scan Passport
-    </div>
+        <p>
+            Winterharbor Guest Registration
+        </p>
 
-    <div class="scan-help">
-      Tap here to take a photo or select a passport image.
-      <br><br>
-      Make sure the complete passport page and MRZ lines are visible.
-    </div>
+    </header>
 
-  </div>
 
-  <input
-    id="fichier"
-    type="file"
-    accept="image/*"
-  >
+    <!-- =====================================================
+         SCAN AREA
+         ===================================================== -->
 
-  <p id="statut">
-    Ready to scan
-  </p>
+    <div
+        id="zone"
+        role="button"
+        tabindex="0"
+    >
 
-  <img
-    id="apercu"
-    alt="Passport preview"
-  >
+        <div class="camera-icon">
+            📷
+        </div>
 
-  <div class="result-card">
+        <div class="scan-title">
+            Scan Passport
+        </div>
 
-    <h2>Passport Details</h2>
+        <div class="scan-help">
 
-    <pre id="resultat">
-No passport scanned.
-    </pre>
+            Tap here to take a passport photo
+            or select an existing image.
 
-    <div class="buttons">
+            <br><br>
 
-      <button
-        type="button"
-        id="scan-again"
-      >
-        Scan Again
-      </button>
+            Keep the complete information page visible.
 
-      <button
-        type="button"
-        id="use-data"
-      >
-        Use Passport Data
-      </button>
+            <br>
+
+            Make sure the two MRZ lines at the bottom
+            are sharp and readable.
+
+        </div>
 
     </div>
 
-  </div>
+
+    <!--
+    On iPhone this gives the user access to the camera
+    and photo library.
+
+    We intentionally do NOT force capture="environment"
+    because allowing both camera and photo library is useful.
+    -->
+
+    <input
+        id="fichier"
+        type="file"
+        accept="image/*"
+    >
+
+
+    <!-- =====================================================
+         STATUS
+         ===================================================== -->
+
+    <p id="statut">
+        Ready to scan
+    </p>
+
+
+    <!-- =====================================================
+         PASSPORT PREVIEW
+         ===================================================== -->
+
+    <img
+        id="apercu"
+        alt="Passport preview"
+    >
+
+
+    <!-- =====================================================
+         RESULT
+         ===================================================== -->
+
+    <section class="result-card">
+
+        <h2 class="result-title">
+            Passport Details
+        </h2>
+
+
+        <pre id="resultat">No passport scanned.</pre>
+
+
+        <!-- =================================================
+             ACTION BUTTONS
+             ================================================= -->
+
+        <div class="buttons">
+
+            <button
+                id="scan-again"
+                class="button"
+                type="button"
+            >
+                📷 Scan Again
+            </button>
+
+
+            <button
+                id="use-data"
+                class="button"
+                type="button"
+            >
+                ✓ Use Passport Data
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         PRIVACY
+         ===================================================== -->
+
+    <div class="privacy">
+
+        <strong>Privacy:</strong>
+
+        Passport recognition is processed locally
+        by the scanner in your browser.
+
+    </div>
+
+
+    <!-- =====================================================
+         HIDDEN COMPATIBILITY ELEMENTS
+         =====================================================
+
+         These elements are kept because older playground
+         functions may reference them.
+
+         They are intentionally hidden from the normal
+         Winterharbor interface.
+         ===================================================== -->
+
+    <section
+        id="diagnostic"
+        style="display:none;"
+    >
+
+        <pre
+            id="diagnostic-contenu"
+        ></pre>
+
+    </section>
+
+
+    <section
+        id="rapport"
+        style="display:none;"
+    >
+
+        <pre
+            id="rapport-contenu"
+        ></pre>
+
+        <button
+            id="rapport-copier"
+            type="button"
+        >
+            Copy Report
+        </button>
+
+    </section>
+
+
+    <section
+        id="vignettes"
+        style="display:none;"
+    >
+
+        <div
+            id="vignettes-contenu"
+        ></div>
+
+    </section>
+
 
 </div>
 
 
-<!--
-These elements are retained because the original
-playground TypeScript may still reference them.
-They are hidden from the user.
--->
+<!-- =========================================================
+     IDENTITE-TS APPLICATION
 
-<div id="diagnostic" style="display:none;">
-  <pre id="diagnostic-contenu"></pre>
-</div>
+     Do not add another JavaScript block for Scan Again or
+     Use Passport Data.
 
-<div id="rapport" style="display:none;">
-  <pre id="rapport-contenu"></pre>
-  <button id="rapport-copier" type="button">
-    Copy
-  </button>
-</div>
+     Both buttons are handled by playground/src/main.ts.
+     ========================================================= -->
 
-<div id="vignettes" style="display:none;">
-  <div id="vignettes-contenu"></div>
-</div>
+<script
+    type="module"
+    src="/src/main.ts"
+></script>
 
-
-<script type="module" src="/src/main.ts"></script>
-
-
-<script>
-  document
-    .getElementById('scan-again')
-    .addEventListener('click', function () {
-
-      document.getElementById('fichier').value = '';
-
-      document.getElementById('resultat').textContent =
-        'No passport scanned.';
-
-      document.getElementById('statut').textContent =
-        'Ready to scan';
-
-      document.getElementById('apercu').style.display =
-        'none';
-
-      document.getElementById('fichier').click();
-
-    });
-
-
-  document
-    .getElementById('use-data')
-    .addEventListener('click', function () {
-
-      alert(
-        'Passport data connection to Booking will be added next.'
-      );
-
-    });
-</script>
 
 </body>
+
 </html>
